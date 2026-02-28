@@ -10,20 +10,26 @@ ROOT = Path(__file__).parent.parent.parent
 IMAGES = ROOT / "images"
 ARTIFACTS = ROOT / "artifacts"
 
-def resize_mask(mask, up_size):
+
+def resize_mask(mask, up_size, mode='bilinear'):
     mask_t = torch.from_numpy(mask).unsqueeze(0).unsqueeze(0)  # (1,1,s,s)
-    mask_up = F.interpolate(mask_t, size=up_size.tolist(), mode='bilinear', align_corners=False)
+    if mode == 'bilinear':
+        mask_up = F.interpolate(mask_t, size=up_size.tolist(), mode='bilinear', align_corners=False)
+    else:
+        mask_up = F.interpolate(mask_t, size=up_size.tolist(), mode=mode)
+
     return mask_up.squeeze()
 
 class RISE(nn.Module):
-    def __init__(self, model, input_size, gpu_batch=100, device=None):
+    def __init__(self, model, x, gpu_batch=100, device=None):
         super(RISE, self).__init__()
         self.model = model
-        self.input_size = input_size
+        _, _,H, W = x.shape
+        self.input_size = (H, W)
         self.gpu_batch = gpu_batch
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def generate_masks(self, N, s, p, savepath = ARTIFACTS / 'masks.npy'):
+    def generate_masks(self, N, s, p, savepath = ARTIFACTS / 'masks.npy', mode='bilinear'):
         cell_size = np.ceil(np.array(self.input_size) / s).astype(int)
         up_size = (s + 1) * cell_size   # +1 so we can shift grids
 
@@ -37,7 +43,7 @@ class RISE(nn.Module):
             x = np.random.randint(0, cell_size[0])
             y = np.random.randint(0, cell_size[1])
 
-            up_mask = resize_mask(grids[i], up_size)
+            up_mask = resize_mask(grids[i], up_size, mode=mode)
             self.masks[i, :, :] = up_mask[x:x + self.input_size[0],
                                         y:y + self.input_size[1]]
 
@@ -98,4 +104,3 @@ class RISE(nn.Module):
         sal = sal.view(n_classes, H, W)
 
         return sal
-    
