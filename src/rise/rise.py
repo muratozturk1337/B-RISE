@@ -1,14 +1,9 @@
-from pathlib import Path
+
 import numpy as np
 import torch
 from torch import nn
 import torch.nn.functional as F
 from tqdm import tqdm
-
-
-ROOT = Path(__file__).parent.parent.parent
-IMAGES = ROOT / "images"
-ARTIFACTS = ROOT / "artifacts"
 
 
 def resize_mask(mask, up_size, mode='bilinear'):
@@ -29,14 +24,14 @@ class RISE(nn.Module):
         self.gpu_batch = gpu_batch
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def generate_masks(self, N, s, p, savepath = ARTIFACTS / 'masks.npy', mode='bilinear'):
+    def generate_masks(self, N, s, p, mode='bilinear'):
         cell_size = np.ceil(np.array(self.input_size) / s).astype(int)
         up_size = (s + 1) * cell_size   # +1 so we can shift grids
 
         grids = np.random.rand(N, s, s) < p
         grids = grids.astype('float32')
 
-        self.masks = np.empty((N, *self.input_size), dtype=np.float32)
+        self.masks = torch.empty(N, *self.input_size, device=self.device)
 
         for i in tqdm(range(N), desc='Generating filters'):
             # Random shifts
@@ -45,29 +40,13 @@ class RISE(nn.Module):
 
             up_mask = resize_mask(grids[i], up_size, mode=mode)
             self.masks[i, :, :] = up_mask[x:x + self.input_size[0],
-                                        y:y + self.input_size[1]]
+                                          y:y + self.input_size[1]]
 
         self.masks = self.masks.reshape(N, 1, *self.input_size)    # (N, 1, H, W) add dim for channel
-        np.save(savepath, self.masks)
-        self.masks = torch.from_numpy(self.masks)
-        self.masks = self.masks.to(self.device)
         self.N = N
         self.p = p
 
-    def load_masks(self, filepath = ARTIFACTS / 'masks.npy'):
-        self.masks = np.load(filepath)
-        self.masks = torch.from_numpy(self.masks).to(self.device)
-        self.N = self.masks.shape[0]
-        self.p = self.masks.mean().item()
-
-    def forward(self, x, method="rise"):
-        """
-        x: Tensor (1, C, H, W)
-        method: "rise" | "banzhaf-approx"
-        returns: saliency map (num_classes, H, W)
-        """
-        assert method in {"rise", "banzhaf-approx"}
-
+    def forward(self, x):
         N = self.N
         _, C, H, W = x.shape
 
@@ -86,21 +65,12 @@ class RISE(nn.Module):
 
         M = self.masks.view(N, H * W).float()  # (N, HW)
 
-        if method == "rise":
-            sal = outputs_T @ M               # (num_classes, HW)
-            sal = sal / (N * self.p)
-        elif method == "banzhaf-approx":
-            eps = 1e-6
-            count_1 = M.sum(dim=0)            # (HW,)
-            count_0 = N - count_1
+        # Compute saliency map
+        sal = outputs_T @ M               # (num_classes, HW)
+        sal = sal / (N * self.p)
 
-            sum_1 = outputs_T @ M
-            sum_0 = outputs_T @ (1 - M)
-
-            sal = sum_1 / (count_1 + eps) - sum_0 / (count_0 + eps)
-
+        # Reshape to (num_classes, H, W)
         n_classes = outputs.shape[1]
-
         sal = sal.view(n_classes, H, W)
 
         return sal

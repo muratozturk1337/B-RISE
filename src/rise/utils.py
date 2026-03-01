@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import numpy as np
 from PIL import Image
 import torch
@@ -5,21 +7,18 @@ from torchvision import transforms
 import matplotlib.pyplot as plt
 from PIL import Image
 
+
+ROOT = Path(__file__).parent.parent.parent
+IMAGES = ROOT / "images"
+
 ### Image utils
 
 def load_image(path, device, preprocess):
-    """
-        img       : PIL.Image (for visualization)
-        x  : torch.Tensor (1,3,H,W) normalized for model
-    """
     img = Image.open(path).convert("RGB")
     x = preprocess(img).unsqueeze(0).to(device)
     return img, x
 
 def draw_image(img):
-    """
-    img: PIL.Image or numpy array (H, W, 3) in [0,255] or [0,1]
-    """
     if not isinstance(img, np.ndarray):
         img = np.array(img)
 
@@ -114,3 +113,19 @@ def draw_saliency_overlay(img, saliency_maps, topk, k=0):
 
     return saliency
 
+def draw_saliency_overlay_mnist(img, saliency_maps, class_id):
+    # Image
+    if torch.is_tensor(img):
+        img = img.cpu().squeeze().numpy()
+    
+    # Saliency
+    sal = saliency_maps[class_id]
+    if torch.is_tensor(sal):
+        sal = sal.cpu().numpy()
+    
+    plt.figure(figsize=(4,4))
+    plt.imshow(img, cmap="gray")
+    plt.imshow(sal, cmap="jet", alpha=0.5)
+    plt.title(f"Class {class_id}")
+    plt.axis("off")
+    plt.show()
