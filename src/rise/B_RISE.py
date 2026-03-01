@@ -5,9 +5,9 @@ import torch.nn.functional as F
 from tqdm import tqdm
 
 
-class RISE_B(nn.Module):
+class B_RISE(nn.Module):
     def __init__(self, model, x, gpu_batch=100, device=None):
-        super(RISE_B, self).__init__()
+        super(B_RISE, self).__init__()
         self.model = model
         _, _, H, W = x.shape
         self.input_size = (H, W)
@@ -49,7 +49,11 @@ class RISE_B(nn.Module):
 
         return cropped.unsqueeze(0).unsqueeze(0)
     
-    def forward(self, x):
+    def forward(self, x, K=None):
+        # Calculate Computation, Forward Pass Count estimate
+        forwardpass_estimate = self.N * (1 + (K if K is not None else self.s**2 * (1-self.p)))
+        print(f"Estimated forward passes: {forwardpass_estimate}")
+        # Start Algortihm
         with torch.no_grad():
                 num_classes = self.model(x).shape[1]
 
@@ -68,13 +72,22 @@ class RISE_B(nn.Module):
                 forwardpass_counter += 1
                 
             zero_positions = np.argwhere(grid == 0)
-            if len(zero_positions) == 0:
+            M = len(zero_positions)
+            if M == 0:
                 continue
             
+            if K is not None and M > K:
+                sampled_indices = np.random.choice(M, K, replace=False)
+                sampled_positions = zero_positions[sampled_indices]
+            else:
+                sampled_positions = zero_positions
+                K = M
+            scale = M / K # Scale factor to account for sampling fewer subsets
+
             # calculate flipped masks for all zero positions
             flipped_masks = []
 
-            for (i, j) in zero_positions:
+            for (i, j) in sampled_positions:
                 flipped_grid = grid.copy()
                 flipped_grid[i, j] = 1
 
@@ -95,7 +108,7 @@ class RISE_B(nn.Module):
                 delta_mask = flipped_masks[idx] - base_mask             # (1,1,H,W)
                 delta_mask = delta_mask.squeeze(0)                      # (1,H,W)
 
-                saliency += diff_vec.view(-1, 1, 1) * delta_mask        # (num_classes,H,W)
+                saliency += diff_vec.view(-1, 1, 1) * delta_mask * scale        # (num_classes,H,W)
 
             
         print("Total forward passes:", forwardpass_counter)
