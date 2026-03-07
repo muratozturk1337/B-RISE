@@ -24,7 +24,7 @@ class RISE(nn.Module):
         self.gpu_batch = gpu_batch
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    def generate_masks(self, N, s, p, mode='bilinear'):
+    def generate_masks(self, N, s, p, mode='bilinear', no_shift=False):
         cell_size = np.ceil(np.array(self.input_size) / s).astype(int)
         up_size = (s + 1) * cell_size   # +1 so we can shift grids
 
@@ -38,9 +38,13 @@ class RISE(nn.Module):
             x = np.random.randint(0, cell_size[0])
             y = np.random.randint(0, cell_size[1])
 
-            up_mask = resize_mask(grids[i], up_size, mode=mode)
-            self.masks[i, :, :] = up_mask[x:x + self.input_size[0],
-                                          y:y + self.input_size[1]]
+            if no_shift:
+                up_mask = resize_mask(grids[i], up_size - cell_size, mode=mode)
+                self.masks[i, :, :] = up_mask
+            else:
+                up_mask = resize_mask(grids[i], up_size, mode=mode)
+                self.masks[i, :, :] = up_mask[x:x + self.input_size[0],
+                                              y:y + self.input_size[1]]
 
         self.masks = self.masks.reshape(N, 1, *self.input_size)    # (N, 1, H, W) add dim for channel
         self.N = N

@@ -87,7 +87,9 @@ def get_topk_predictions(model, x, weights, k=5):
         return topk
 
 
-def draw_saliency_overlay(img, saliency_maps, topk, k=0):
+def draw_saliency_overlay(img, saliency_maps, topk, k=0, norm_mode="symmetric", alpha = 0.7):
+    assert norm_mode in ["symmetric", "minmax"], "norm_mode must be 'symmetric' or 'minmax'"
+    
     # Convert image
     if not isinstance(img, np.ndarray):
         img = np.array(img)
@@ -100,20 +102,33 @@ def draw_saliency_overlay(img, saliency_maps, topk, k=0):
     class_name = topk[k]["class_name"]
     score = topk[k]["logit"]
 
-    saliency = saliency_maps[class_id]
-    saliency_np = saliency.cpu().numpy()
+    sal = saliency_maps[class_id]
+    if torch.is_tensor(sal):
+        sal = sal.cpu().numpy()
+
+    if norm_mode == "symmetric":
+        max_abs = np.abs(sal).max()
+        vmin, vmax = -max_abs, max_abs
+        cmap = "seismic"
+    elif norm_mode == "minmax":
+        vmin, vmax = sal.min(), sal.max()
+        cmap = "jet"
+
 
     # Plot
     plt.figure(figsize=(5, 5))
     plt.imshow(img)
-    plt.imshow(saliency_np, cmap="jet", alpha=0.5)
-    plt.title(f"Class: {class_name}, Logit: {score:.4f}", fontsize=14)
+    plt.imshow(sal, cmap=cmap, alpha=alpha, vmin=vmin, vmax=vmax)
+    plt.colorbar(fraction=0.045, pad=0.05)
+    plt.title(f"Class: {class_name} ({alpha} alpha)", fontsize=14)
     plt.axis("off")
     plt.show()
 
-    return saliency
+    return sal
 
-def draw_saliency_overlay_mnist(img, saliency_maps, class_id):
+def draw_saliency_overlay_mnist(img, saliency_maps, class_id, norm_mode="symmetric", alpha = 0.7):
+    assert norm_mode in ["symmetric", "minmax"], "norm_mode must be 'symmetric' or 'minmax'"
+
     # Image
     if torch.is_tensor(img):
         img = img.cpu().squeeze().numpy()
@@ -123,9 +138,20 @@ def draw_saliency_overlay_mnist(img, saliency_maps, class_id):
     if torch.is_tensor(sal):
         sal = sal.cpu().numpy()
     
+    if norm_mode == "symmetric":
+        max_abs = np.abs(sal).max()
+        vmin, vmax = -max_abs, max_abs
+        cmap = "seismic"
+    elif norm_mode == "minmax":
+        vmin, vmax = sal.min(), sal.max()
+        cmap = "jet"
+
     plt.figure(figsize=(4,4))
     plt.imshow(img, cmap="gray")
-    plt.imshow(sal, cmap="jet", alpha=0.5)
-    plt.title(f"Class {class_id}")
+    plt.imshow(sal, cmap=cmap, alpha=alpha, vmin=vmin, vmax=vmax)
+    plt.colorbar(fraction=0.045, pad=0.05)
+    plt.title(f"Class {class_id} ({alpha} alpha)")
     plt.axis("off")
     plt.show()
+
+    return sal

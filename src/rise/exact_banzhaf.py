@@ -1,4 +1,5 @@
 import torch
+from tqdm.asyncio import tqdm
 
 
 def build_supergrid_mask(mask_vec, s=2, H=28, W=28):
@@ -35,7 +36,7 @@ def exact_banzhaf_supergrid(model, x, s):
 
     # Precompute P(S)
     with torch.no_grad():
-        for mask_int in range(num_subsets):
+        for mask_int in tqdm(range(num_subsets), desc='Generating Subsets and Computing Model Outputs'):
 
             mask_vec = torch.tensor(
                 [(mask_int >> j) & 1 for j in range(d)],
@@ -49,7 +50,7 @@ def exact_banzhaf_supergrid(model, x, s):
     # Compute exact Banzhaf
     beta = torch.zeros(num_classes, d, device=device)
 
-    for i in range(d):
+    for i in tqdm(range(d), desc='Computing Banzhaf'):
         total = torch.zeros(num_classes, device=device)
 
         for mask_int in range(num_subsets):
