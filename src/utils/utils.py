@@ -87,7 +87,7 @@ def get_topk_predictions(model, x, weights, k=5):
         return topk
 
 
-def draw_saliency_overlay(img, saliency_maps, topk, k=0, norm_mode="symmetric", alpha = 0.7):
+def draw_saliency_overlay(img, saliency_maps, topk, k=0, norm_mode="symmetric", alpha = 0.7, cmap="seismic"):
     assert norm_mode in ["symmetric", "minmax"], "norm_mode must be 'symmetric' or 'minmax'"
     
     # Convert image
@@ -109,10 +109,8 @@ def draw_saliency_overlay(img, saliency_maps, topk, k=0, norm_mode="symmetric", 
     if norm_mode == "symmetric":
         max_abs = np.abs(sal).max()
         vmin, vmax = -max_abs, max_abs
-        cmap = "seismic"
     elif norm_mode == "minmax":
         vmin, vmax = sal.min(), sal.max()
-        cmap = "jet"
 
 
     # Plot
@@ -126,7 +124,7 @@ def draw_saliency_overlay(img, saliency_maps, topk, k=0, norm_mode="symmetric", 
 
     return sal
 
-def draw_saliency_overlay_mnist(img, saliency_maps, class_id, norm_mode="symmetric", alpha = 0.7):
+def draw_saliency_overlay_mnist(img, saliency_maps, class_id, norm_mode="symmetric", alpha = 0.7, cmap="seismic"):
     assert norm_mode in ["symmetric", "minmax"], "norm_mode must be 'symmetric' or 'minmax'"
 
     # Image
@@ -141,10 +139,8 @@ def draw_saliency_overlay_mnist(img, saliency_maps, class_id, norm_mode="symmetr
     if norm_mode == "symmetric":
         max_abs = np.abs(sal).max()
         vmin, vmax = -max_abs, max_abs
-        cmap = "seismic"
     elif norm_mode == "minmax":
         vmin, vmax = sal.min(), sal.max()
-        cmap = "jet"
 
     plt.figure(figsize=(4,4))
     plt.imshow(img, cmap="gray")
