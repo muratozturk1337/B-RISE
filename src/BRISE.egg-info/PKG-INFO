@@ -1,0 +1,13 @@
+Metadata-Version: 2.1
+Name: BRISE
+Version: 0.1.0
+Summary: Banzhaf-based RISE explanations
+Requires-Python: >=3.12
+Requires-Dist: jupyterlab
+Requires-Dist: ipykernel
+Requires-Dist: numpy
+Requires-Dist: torch
+Requires-Dist: torchvision
+Requires-Dist: tqdm
+Requires-Dist: matplotlib
+Requires-Dist: scipy
